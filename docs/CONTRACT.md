@@ -17,7 +17,7 @@ Source of truth: [`backend/callshield/contracts.py`](../backend/callshield/contr
 |---|---|
 | Audio | PCM signed 16-bit little-endian, mono, 16 kHz, 200 ms chunks (6400 bytes) |
 | Audio timestamps | Derived from the sample count since the first chunk of that track (epoch ms) |
-| Video | JPEG q≈0.7, max 1280 px wide, one frame every ~2 s, rendered Meet tab (not per-participant) |
+| Video | JPEG q≈0.8, max 1920 px wide, one frame every ~2 s, rendered Meet tab (not per-participant). Optional `change_score` (0–1, grayscale thumbnail difference vs the previous frame) lets the backend analyse only settled new scenes. |
 
 ## Speaker roles
 

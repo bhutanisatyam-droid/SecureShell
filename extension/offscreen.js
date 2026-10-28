@@ -4,8 +4,11 @@
 const TARGET_RATE = 16000;
 const CHUNK_MS = 200;
 const FRAME_INTERVAL_MS = 2000;
-const FRAME_MAX_WIDTH = 1280;
-const JPEG_QUALITY = 0.7;
+// Sharp enough for the backend's vision model to read a card or document held up in a tile.
+const FRAME_MAX_WIDTH = 1920;
+const JPEG_QUALITY = 0.8;
+const THUMB_W = 32;
+const THUMB_H = 18;
 const AUDIO_BUFFER_LIMIT = 512 * 1024;
 const VIDEO_BUFFER_LIMIT = 128 * 1024;
 
@@ -123,8 +126,28 @@ function startFrames(videoTrack) {
   video.play().catch(() => {});
   const canvas = new OffscreenCanvas(1, 1);
   const g = canvas.getContext('2d');
+  const thumb = new OffscreenCanvas(THUMB_W, THUMB_H);
+  const tg = thumb.getContext('2d', { willReadFrequently: true });
+  let prevThumb = null;
   let seq = 0;
   let busy = false;
+
+  // Mean absolute grayscale difference vs the previous frame, 0..1. Lets the backend
+  // analyse a frame only once something new (a card, a shared screen) has settled.
+  function changeScore() {
+    tg.drawImage(video, 0, 0, THUMB_W, THUMB_H);
+    const px = tg.getImageData(0, 0, THUMB_W, THUMB_H).data;
+    const gray = new Float32Array(THUMB_W * THUMB_H);
+    for (let i = 0; i < gray.length; i++) gray[i] = (px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114) / 255;
+    let score = null;
+    if (prevThumb) {
+      let sum = 0;
+      for (let i = 0; i < gray.length; i++) sum += Math.abs(gray[i] - prevThumb[i]);
+      score = Math.round((sum / gray.length) * 1000) / 1000;
+    }
+    prevThumb = gray;
+    return score;
+  }
   const timer = setInterval(async () => {
     if (busy || !video.videoWidth) return;
     if (!wsOpen() || s.ws.bufferedAmount > VIDEO_BUFFER_LIMIT) { s.counters.video_dropped++; return; }
@@ -134,13 +157,14 @@ function startFrames(videoTrack) {
       canvas.width = Math.round(video.videoWidth * scale);
       canvas.height = Math.round(video.videoHeight * scale);
       g.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const change = changeScore();
       const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITY });
       const bytes = await blob.arrayBuffer();
       if (!wsOpen()) return;
       const n = seq++;
-      const env = envelope('video_frame', 'meet_tab', {
-        seq: n, t_ms: Date.now(), width: canvas.width, height: canvas.height, encoding: 'jpeg',
-      }, `frame-${s.sessionId}-${n}`);
+      const payload = { seq: n, t_ms: Date.now(), width: canvas.width, height: canvas.height, encoding: 'jpeg' };
+      if (change !== null) payload.change_score = change;
+      const env = envelope('video_frame', 'meet_tab', payload, `frame-${s.sessionId}-${n}`);
       s.ws.send(binaryFrame(env, bytes));
       s.counters.video_sent++;
     } catch (e) {

@@ -167,3 +167,73 @@ def test_failing_backend_is_rested(det):
     asyncio.run(det._complete("x"))
     asyncio.run(det._complete("x"))
     assert seen.count("api.groq.com") == 1  # not retried on the second call
+
+
+def _vision_pipeline(monkeypatch, observations):
+    monkeypatch.setenv("SARVAM_API_KEY", "s")
+    monkeypatch.setenv("GROQ_API_KEY", "g")
+    monkeypatch.setenv("GEMINI_API_KEY", "m")
+    p = LivePipeline()
+    p.configure(load_risk_config())
+    calls = []
+
+    async def analyze(jpeg):
+        from callshield.ai.vision import FrameObservation
+        calls.append(jpeg)
+        return FrameObservation(**observations[min(len(calls), len(observations)) - 1])
+    p.vision.analyze = analyze
+    lines = []
+
+    async def no_llm(user):  # record what the text detector would see
+        lines.append(user)
+        return {"lines": []}
+    p.detector._complete = no_llm
+    return p, calls, lines
+
+
+def _frame(seq, change):
+    from callshield.contracts import VideoFrame
+    return VideoFrame(seq=seq, t_ms=1000 + seq, width=1280, height=720, encoding="jpeg", change_score=change)
+
+
+def test_vision_gating_and_document_text_reaches_detector(monkeypatch):
+    import callshield.ai.pipeline as P
+    monkeypatch.setattr(P, "VISION_MIN_INTERVAL_S", 0.0)
+    doc = {"documents": [{"kind": "warrant", "text": "ARREST WARRANT pay Rs 2,00,000 within 1 hour", "agency": "CCB"}],
+           "cues": ["police_style_uniform"], "confidence": 0.9}
+    p, calls, seen_by_llm = _vision_pipeline(monkeypatch, [doc])
+    emitted = []
+
+    async def run():
+        async def emit(env):
+            emitted.append(env)
+        await p.start_session("s1", emit)
+        await p.on_video("s1", "f0", _frame(0, None), b"a")    # first frame: periodic check
+        await asyncio.sleep(0.05)
+        await p.on_video("s1", "f1", _frame(1, 0.01), b"b")    # static: nothing new
+        await p.on_video("s1", "f2", _frame(2, 0.30), b"c")    # card raised: moving, wait
+        await p.on_video("s1", "f3", _frame(3, 0.005), b"d")   # settled: analyse
+        await asyncio.sleep(0.05)
+        await p.on_video("s1", "f4", _frame(4, 0.30), b"e")
+        await p.on_video("s1", "f5", _frame(5, 0.005), b"f")   # same card again
+        await asyncio.sleep(3.0)                                # let the batched text call run
+        assert p.latest_frame("s1")["event_id"] == "f5"
+        await p.end_session("s1")
+    asyncio.run(run())
+    assert calls == [b"a", b"d", b"f"]
+    ev = [e.payload for e in emitted if e.event_type == "evidence"]
+    # uniform + document cue once each (no re-emit within a minute), sourced from the frame
+    assert sorted(e["category"] for e in ev) == ["visual_official_document", "visual_uniform"]
+    assert all(e["source_modality"] == "video" for e in ev)
+    # the warrant text went to the text detector exactly once despite being seen three times
+    joined = "\n".join(seen_by_llm)
+    assert joined.count("ARREST WARRANT") >= 1 and "(screen)" in joined
+    assert sum(u.count("[warrant from CCB shown on video]") > 0 for u in seen_by_llm) >= 1
+
+
+def test_vision_validate_drops_unknown_kinds_and_cues():
+    from callshield.ai.vision import GeminiVision
+    o = GeminiVision.validate({"documents": [{"kind": "warrant", "text": "x"}, {"kind": "selfie"}],
+                               "cues": ["police_style_uniform", "looks_fake"], "confidence": "high"})
+    assert [d["kind"] for d in o.documents] == ["warrant"]
+    assert o.cues == ["police_style_uniform"] and o.confidence == 0.5

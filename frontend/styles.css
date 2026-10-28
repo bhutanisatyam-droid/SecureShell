@@ -64,6 +64,11 @@ button, .button { font: inherit; font-weight: 700; padding: 8px 14px; border-rad
 .tag.flag { background: #fce8e6; color: #a50e0e; border-color: #f4b4ad; }
 .item.flagged { background: rgba(217,48,37,.06); }
 .item.retracted b, .item.retracted .muted { text-decoration: line-through; opacity: .6; }
+.vision { display: grid; grid-template-columns: minmax(0, 420px) 1fr; gap: 16px; align-items: start; }
+.vision img { width: 100%; border-radius: 8px; border: 1px solid var(--line); }
+.vision .doc { margin: 0 0 10px; } .vision .doc pre { white-space: pre-wrap; margin: 4px 0 0; font: 12px/1.4 ui-monospace, Consolas, monospace; background: var(--bg); padding: 8px; border-radius: 6px; }
+@media (max-width: 900px) { .vision { grid-template-columns: 1fr; } }
+#view > .panel { margin-bottom: 16px; }
 .tx { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
 .tx th, .tx td { text-align: left; padding: 6px; border-bottom: 1px solid var(--line); }
 .st-HOLD, .st-DECLINED { color: var(--critical); font-weight: 800; } .st-ALLOWED, .st-RELEASED { color: var(--ok); font-weight: 700; }

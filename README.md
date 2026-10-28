@@ -42,6 +42,10 @@ Environment variables:
 | `CALLSHIELD_RISK_CONFIG` | `backend/risk_config.yaml` | Weights / thresholds (Shlok owns the values) |
 | `CALLSHIELD_DB` | `callshield.db` | SQLite file |
 | `CALLSHIELD_ATTEST_SECRET` | random per run | HMAC key for simulated bank risk attestations |
+| `SARVAM_API_KEY` | – | Streaming Hinglish speech-to-text (required for live mode) |
+| `GROQ_API_KEY` / `GEMINI_API_KEY` | – | LLM detector backends (at least one); Gemini also enables video analysis |
+| `CALLSHIELD_LLM_BACKENDS` | `groq:openai/gpt-oss-120b,groq:openai/gpt-oss-20b,gemini:gemini-flash-lite-latest` | Failover order |
+| `CALLSHIELD_VISION` / `CALLSHIELD_VISION_MODEL` | `on` / `gemini-3.5-flash-lite` | Frame analysis on/off and model |
 
 ## Try it without Chrome
 

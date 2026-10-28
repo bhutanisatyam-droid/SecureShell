@@ -73,6 +73,14 @@
         </div>
 
         <div class="panel">
+          <h3>Video analysis <span class="muted small">(last frame the vision model checked; reports what is shown, never whether it is genuine)</span></h3>
+          <div class="vision">
+            <img id="visionImg" alt="Last analysed video frame" class="hidden" />
+            <div id="visionInfo" class="muted">No frame analysed yet.</div>
+          </div>
+        </div>
+
+        <div class="panel">
           <h3>Mock bank <span class="badge warn">SIMULATION</span></h3>
           <form id="transfer" class="row">
             <input id="amount" type="number" min="1" value="50000" />

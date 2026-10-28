@@ -14,7 +14,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import PlainTextResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -204,6 +204,25 @@ def create_app(*, config_path: str | None = None, pipeline: AIPipeline | None = 
         if s is None or not s.active:
             raise HTTPException(404, "no active session")
         return s.inject_text(body.text, body.speaker_role).model_dump()
+
+    def _latest_frame(session_id: str) -> dict | None:
+        getter = getattr(pipeline, "latest_frame", None)
+        return getter(session_id) if getter else None
+
+    @app.get("/api/sessions/{session_id}/vision/latest", dependencies=auth)
+    def vision_latest(session_id: str) -> dict[str, Any]:
+        """Last frame the vision model analysed (kept in memory only, never stored)."""
+        f = _latest_frame(session_id)
+        if not f:
+            return {"available": False}
+        return {"available": True, **{k: v for k, v in f.items() if k != "jpeg"}}
+
+    @app.get("/api/sessions/{session_id}/vision/latest.jpg", dependencies=auth)
+    def vision_latest_jpg(session_id: str):
+        f = _latest_frame(session_id)
+        if not f:
+            raise HTTPException(404, "no analysed frame")
+        return Response(content=f["jpeg"], media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/bank/transfers", dependencies=auth)
     def bank_list(session_id: str | None = None):

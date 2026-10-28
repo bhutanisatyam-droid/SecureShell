@@ -9,6 +9,7 @@ Labels: **verified** (reproducible test passes), **implemented** (code written, 
 |---|---|---|---|
 | 1 | Fraud detection with red flag from spoken terms over calls | implemented | Live pipeline: Sarvam saaras:v4 codemix streaming ASR → Groq gpt-oss-120b contextual detector (`backend/callshield/ai/`). Text-level dev metrics in `eval/results/`; live Meet run pending. |
 | 1 | …and received messages during calls | verified on real Meet | Meet chat DOM observer (`[data-message-id]`); must be validated on the live Meet UI. |
+| 1 | …video: documents / IDs / uniforms shown on the call | implemented, verified by replay | Gemini vision on gated frames (new scene settled, ≤1 per 10 s, plus once a minute; ~2 calls in a 25 s test call). Document text joins the transcript and is judged in context; appearance cues are capped modifiers. Never judges authenticity. Planned architecture: local YOLO-World + OCR trigger with Gemini only on detected crops (not built: no bandwidth for the ~3–4 GB model download). |
 | 2 | POC-level solution | implemented | |
 | 3 | Disconnect call | verified (manual), auto pending | Leave button click (icon `call_end` / aria-label) with verification; opt-in close-tab fallback. |
 | 3 | Switch off mobile | **simulated / not met** | Not possible from desktop Chrome. Stated as a limitation. |

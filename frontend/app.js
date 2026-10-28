@@ -242,6 +242,27 @@
     ).join('') || '<tr><td colspan="6" class="muted">No simulated transfers.</td></tr>';
   }
 
+  let lastVisionEvent = null;
+  async function refreshVision() {
+    if (!selected) return;
+    let v;
+    try { v = await api(`/api/sessions/${encodeURIComponent(selected)}/vision/latest`); } catch { return; }
+    if (!v.available) {
+      $('visionImg').classList.add('hidden');
+      $('visionInfo').textContent = 'No frame analysed yet (needs GEMINI_API_KEY; frames are checked when the picture changes, and once a minute).';
+      return;
+    }
+    if (v.event_id === lastVisionEvent) return;
+    lastVisionEvent = v.event_id;
+    $('visionImg').src = `/api/sessions/${encodeURIComponent(selected)}/vision/latest.jpg?token=${encodeURIComponent(token)}&e=${encodeURIComponent(v.event_id)}`;
+    $('visionImg').classList.remove('hidden');
+    const docs = v.documents.map((d) => `<div class="doc"><b>${esc(d.kind.replace(/_/g, ' '))}</b>` +
+      `${d.agency ? ` <span class="muted">(${esc(d.agency)})</span>` : ''}${d.text ? `<pre>${esc(d.text)}</pre>` : ''}</div>`).join('');
+    const cues = v.cues.length ? `<div>Cues: ${v.cues.map((c) => `<span class="tag">${esc(c.replace(/_/g, ' '))}</span>`).join(' ')}</div>` : '';
+    $('visionInfo').innerHTML = `<div class="muted small">${fmtTime(v.t_ms)} · ${v.latency_ms} ms · confidence ${v.confidence}</div>` +
+      (docs || cues ? docs + cues : '<div>Nothing relevant visible.</div>');
+  }
+
   async function refreshTransfers() {
     if (!selected) return;
     view.transfers = await api(`/api/bank/transfers?session_id=${encodeURIComponent(selected)}`);
@@ -314,5 +335,6 @@
   }
 
   setInterval(refreshTransfers, 3000);
+  setInterval(refreshVision, 3000);
   connect();
 })();

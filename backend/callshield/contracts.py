@@ -58,6 +58,9 @@ class VideoFrame(_Strict):
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     encoding: Literal["jpeg"]
+    # Mean absolute difference (0-1) of a tiny grayscale thumbnail vs the previous frame,
+    # computed in the extension so the backend can pick settled frames without decoding.
+    change_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class ChatMessage(_Strict):
