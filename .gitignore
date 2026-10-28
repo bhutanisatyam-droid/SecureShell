@@ -5,3 +5,6 @@ __pycache__/
 *.db-wal
 *.db-shm
 .env
+
+# third-party photos used only for local vision tests (licenses in CREDITS.json)
+eval/images/external/

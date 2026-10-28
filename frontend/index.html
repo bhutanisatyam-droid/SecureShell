@@ -3,88 +3,160 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CallShield Dashboard</title>
+  <title>CallShield — Real-Time Google Meet Fraud &amp; Digital-Arrest Defense</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300e5ff'><path d='M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z'/></svg>" />
 </head>
 <body>
-  <header>
-    <div class="brand">CallShield <span class="sub">live fraud-call monitor</span></div>
-    <div id="conn" class="badge">connecting…</div>
+  <header class="app-header">
+    <div class="brand-wrap">
+      <svg class="brand-logo-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+        <path d="M12 6a4 4 0 0 0-4 4v2h1v-2a3 3 0 0 1 6 0v2h1v-2a4 4 0 0 0-4-4z" fill="#070a12"/>
+      </svg>
+      <div>
+        <div class="brand-text">
+          CallShield
+          <span class="brand-badge">Defense Console</span>
+        </div>
+        <div class="brand-sub">Real-Time Google Meet Fraud &amp; Digital Arrest Defense</div>
+      </div>
+    </div>
+
+    <div class="header-meta">
+      <div id="connectionPill" class="connection-pill disconnected">
+        <span class="pulse-dot"></span>
+        <span id="connectionText">Connecting…</span>
+      </div>
+      <button class="btn btn-xs btn-ghost" id="btnConfigToken" title="Configure API Authentication Token">
+        ⚙ Token
+      </button>
+    </div>
   </header>
 
-  <div class="layout">
-    <aside>
-      <h3>Sessions</h3>
-      <ul id="sessions"></ul>
+  <div class="app-layout">
+    <aside class="app-sidebar">
+      <div class="sidebar-section-header">
+        <span class="sidebar-title">Monitored Sessions</span>
+        <button class="btn-xs btn-ghost" id="btnRefreshSessions" title="Refresh session list">↻</button>
+      </div>
+
+      <ul id="sessionsList" class="sessions-list">
+        <!-- Rendered via JavaScript -->
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="text-muted small">
+          Active target: <b>Google Meet (Chrome)</b>
+        </div>
+        <div id="systemHealthBadge" class="text-muted small">
+          Backend: Checking…
+        </div>
+      </div>
     </aside>
 
-    <main id="main">
-      <p id="empty" class="muted">Start monitoring a Google Meet tab from the extension, or pick a session.</p>
+    <main class="dashboard-workspace" id="mainWorkspace">
+      <!-- Empty state when no session is selected -->
+      <div id="emptyState" class="empty-view-card">
+        <div class="empty-view-icon">🛡️</div>
+        <h2 class="empty-view-title">No Monitored Session Selected</h2>
+        <p class="empty-view-desc">
+          To begin live fraud defense, launch a Google Meet call in desktop Chrome with the 
+          <b>CallShield Extension</b> enabled, or select an existing recorded session from the sidebar.
+        </p>
+      </div>
 
-      <section id="view" class="hidden">
-        <div id="strip" class="strip"></div>
-        <div class="grid">
-          <div class="panel risk" id="riskPanel">
-            <div class="risk-head">
-              <div>
-                <div class="label">Risk index</div>
-                <div class="big"><span id="riskIndex">–</span><span class="of">/100</span></div>
-              </div>
-              <div class="right">
-                <div id="riskLevel" class="level">–</div>
-                <div id="inference" class="badge"></div>
-              </div>
-            </div>
-            <div id="monitoring" class="monitoring"></div>
-            <div class="muted small" id="strength"></div>
-            <div id="patterns" class="chips"></div>
-            <ul id="reasons" class="reasons"></ul>
-            <div class="row">
-              <button id="endCall" class="danger">End call</button>
-              <a id="reportMd" class="button" target="_blank">Incident report</a>
-              <a id="reportJson" class="button ghost" target="_blank">JSON</a>
-            </div>
+      <!-- Active session monitoring view -->
+      <section id="activeSessionView" class="hidden">
+        <!-- Top Telemetry Ribbon -->
+        <div id="telemetryStripContainer"></div>
+
+        <!-- Two-Column Primary Grid -->
+        <div class="dashboard-grid">
+          <!-- Left: Threat Assessment -->
+          <div class="grid-col">
+            <div id="riskContainer"></div>
           </div>
 
-          <div class="panel">
-            <h3>Capture &amp; pipeline health</h3>
-            <dl id="health" class="kv"></dl>
-            <h3>Auto-disconnect gate</h3>
-            <ul id="gate" class="gate"></ul>
+          <!-- Right: Live Transcript & Evidence Ledger -->
+          <div class="grid-col">
+            <div id="transcriptContainer" class="panel-card"></div>
+            <div id="evidenceContainer" class="panel-card mt-4"></div>
           </div>
         </div>
 
-        <div class="grid">
-          <div class="panel">
-            <h3>Transcript &amp; chat <span class="muted small">(raw Hinglish, as received)</span></h3>
-            <div id="transcript" class="feed"></div>
-            <form id="inject" class="row">
-              <input id="injectText" placeholder="Test text (injected, not ASR) e.g. Aap digital arrest mein hain" />
-              <select id="injectRole"><option>remote</option><option>local</option><option>unknown</option></select>
-              <button>Inject</button>
-            </form>
-          </div>
-          <div class="panel">
-            <h3>Evidence</h3>
-            <div id="evidence" class="feed"></div>
-            <h3>Actions</h3>
-            <div id="actions" class="feed short"></div>
-          </div>
-        </div>
+        <!-- Video Analysis Panel -->
+        <div id="visionContainer" class="panel-card mt-4"></div>
 
-        <div class="panel">
-          <h3>Mock bank <span class="badge warn">SIMULATION</span></h3>
-          <form id="transfer" class="row">
-            <input id="amount" type="number" min="1" value="50000" />
-            <input id="payee" value="verify.cbi@upi" />
-            <button>Simulate transfer from victim's account</button>
-          </form>
-          <table class="tx"><thead><tr><th>Time</th><th>Amount (INR)</th><th>Payee</th><th>Status</th><th>Reason</th><th></th></tr></thead>
-            <tbody id="transfers"></tbody></table>
-        </div>
+        <!-- Simulated Banking Protection -->
+        <div id="bankContainer" class="panel-card mt-4"></div>
+
+        <!-- Deep Diagnostics & Action History -->
+        <div id="diagnosticsContainer" class="panel-card mt-4"></div>
       </section>
     </main>
   </div>
-  <script src="app.js"></script>
+
+  <!-- Chakshu Suspicious Communication Report Modal Container -->
+  <div id="chakshuModal" class="modal-wrapper hidden"></div>
+
+  <!-- Incident Report Modal Container -->
+  <div id="reportModal" class="modal-wrapper hidden"></div>
+
+  <!-- Attestation Inspection Modal Container -->
+  <div id="attestationModal" class="modal-wrapper hidden"></div>
+
+  <!-- End Call Safety Confirmation Dialog -->
+  <div id="endCallConfirmModal" class="modal-wrapper hidden">
+    <div class="modal-backdrop" id="endCallBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Emergency End Call Confirmation</h3>
+        <button class="icon-button" id="endCallCloseBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert-box danger-box">
+          <div class="alert-icon">⚠️</div>
+          <div>
+            <b>Warning:</b> This will send an immediate policy command to the Chrome Extension to disconnect and leave the active Google Meet session.
+          </div>
+        </div>
+        <p class="text-secondary text-sm">
+          If the remote caller is claiming to be an official (Police, CBI, Customs) placing you under "digital arrest", disconnecting protects you from extortion and coercive demands.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="endCallCancelBtn">Cancel</button>
+        <button class="btn btn-danger" id="endCallExecuteBtn">Leave Google Meet Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Token Configuration Modal -->
+  <div id="tokenModal" class="modal-wrapper hidden">
+    <div class="modal-backdrop" id="tokenBackdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">API Authentication Settings</h3>
+        <button class="icon-button" id="tokenCloseBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="tokenInput">Bearer API Token</label>
+          <input type="text" id="tokenInput" class="input-text" placeholder="dev-token" />
+          <p class="field-help text-muted text-sm mt-2">
+            Matches <code>CALLSHIELD_TOKEN</code> configured on the FastAPI backend (defaults to <code>dev-token</code>).
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="tokenCancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="tokenSaveBtn">Save &amp; Reconnect</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application Orchestrator -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>

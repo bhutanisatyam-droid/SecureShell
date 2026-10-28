@@ -45,6 +45,9 @@ async def main() -> int:
     ap.add_argument("--base", default="http://localhost:8000")
     ap.add_argument("--token", default="dev-token")
     ap.add_argument("--linger", type=float, default=10.0)
+    ap.add_argument("--image", help="JPEG to 'hold up' on video partway through, e.g. eval/images/demo_warrant_frame.jpg")
+    ap.add_argument("--image-at", type=float, default=8.0, help="seconds into the replay to show --image")
+    ap.add_argument("--before-image", help="JPEG shown before --image (default: no video until then)")
     a = ap.parse_args()
 
     pcm = load_pcm(a.wav)
@@ -92,6 +95,25 @@ async def main() -> int:
                 pass
         drainer = asyncio.create_task(drain())
 
+        async def video():
+            """Sends a frame every 2 s like the extension, with the change score it would compute."""
+            before = open(a.before_image, "rb").read() if a.before_image else None
+            shown = open(a.image, "rb").read()
+            seq, prev = 0, None
+            while True:
+                jpeg = shown if time.time() - t_start >= a.image_at else before
+                if jpeg is not None:
+                    change = None if prev is None else (0.3 if jpeg is not prev else 0.0)
+                    payload = {"seq": seq, "t_ms": int(time.time() * 1000), "width": 1280, "height": 720, "encoding": "jpeg"}
+                    if change is not None:
+                        payload["change_score"] = change
+                    await ws.send(frame(env(sid, "video_frame", "meet_tab", payload, f"frame-{sid}-{seq}"), jpeg))
+                    if prev is not None and jpeg is not prev:
+                        print(f"{time.time() - t_start:6.1f}s VIDEO  now showing {Path(a.image).name}")
+                    prev, seq = jpeg, seq + 1
+                await asyncio.sleep(2.0)
+        video_task = asyncio.create_task(video()) if a.image else None
+
         n = 16000 * CHUNK_MS // 1000 * 2
         base_ms = int(time.time() * 1000)
         silence = b"\x00" * n
@@ -105,6 +127,8 @@ async def main() -> int:
             await asyncio.sleep(max(0.0, (t0 + CHUNK_MS) / 1000 - time.time()))
         await ws.send(json.dumps(env(sid, "control", "extension", {"command": "session_stop", "details": {"reason": "replay_done"}})))
         drainer.cancel()
+        if video_task:
+            video_task.cancel()
     await asyncio.sleep(1)
     watcher.cancel()
 
