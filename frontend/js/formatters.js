@@ -106,26 +106,50 @@ export const CHAKSHU_CATEGORY_MAP = {
 
 export function redactSensitiveText(text, isLocal = false) {
   if (!text) return '';
-  let out = text
-    // ALWAYS REDACT (Victim or Remote):
-    // 4-6 digit OTPs / PINs with context
-    .replace(/(?:otp|code|pin)[:\s-]*(\d{4,6})/gi, 'OTP: [REDACTED_OTP]')
-    // 12-digit Aadhaar-like numbers
-    .replace(/\b\d{4}\s?\d{4}\s?\d{4}\b/g, '[REDACTED_AADHAAR]')
-    // 16-digit card numbers
-    .replace(/\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g, '[REDACTED_CARD]');
+  let out = text;
 
-  // REDACT ONLY IF FROM LOCAL USER (Victim privacy protection):
+  // 1. Account numbers preceded within ~15 chars by a/c, acct, account, khata, खाता
+  const accPrefixRe = /(?<![\w\u0900-\u097F])(a\/c|acct|account|khata|खाता)(?![\w\u0900-\u097F])([^\d\n]{0,15})(\d{9,18})\b/giu;
+  const keptAccounts = [];
+
+  if (isLocal) {
+    out = out.replace(accPrefixRe, (m, g1, g2) => g1 + g2 + '[REDACTED_ACCOUNT]');
+  } else {
+    // Protect remote account numbers so Aadhaar / other rules won't touch them
+    out = out.replace(accPrefixRe, (m, g1, g2, digits) => {
+      keptAccounts.push(digits);
+      return g1 + g2 + '__KEPT_ACC_' + (keptAccounts.length - 1) + '__';
+    });
+  }
+
+  // 2. 16-digit card numbers (runs BEFORE 12-digit Aadhaar to avoid Aadhaar eating first 12 digits)
+  out = out.replace(/\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g, '[REDACTED_CARD]');
+
+  // 3. 12-digit Aadhaar numbers
+  out = out.replace(/\b\d{4}\s?\d{4}\s?\d{4}\b/g, '[REDACTED_AADHAAR]');
+
+  // 4. OTP / PIN in natural Hinglish with whole-word keywords
+  const otpRe = /(?<![\w\u0900-\u097F])(otp|one[- ]time password|code|pin|ओटीपी|कोड|पिन)(?![\w\u0900-\u097F])([^\d\n]{0,25})(\d{4,8})\b/giu;
+  out = out.replace(otpRe, (m, g1, g2) => g1 + g2 + '[REDACTED_OTP]');
+
+  // 5. Local victim identifiers (privacy protection)
   if (isLocal) {
     out = out
       // 10-digit Indian mobile numbers
       .replace(/\b[6-9]\d{9}\b/g, '[REDACTED_PHONE]')
-      // Email addresses and UPI IDs
-      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[REDACTED_EMAIL]')
+      // Email addresses
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
+      // UPI IDs
       .replace(/\b[a-zA-Z0-9.\-_]{2,}@(upi|okaxis|okhdfcbank|oksbi|paytm|icici|ybl|axl|ibl|barodampay|federal)\b/gi, '[REDACTED_UPI]')
-      // Bank account numbers (9-18 digits with context or standalone)
-      .replace(/(?:account|a\/c|acc|acct|no\.?)[:\s#-]*(\d{9,18})\b/gi, 'A/C: [REDACTED_ACCOUNT]')
+      // Any remaining standalone account numbers for local victim
       .replace(/\b\d{9,18}\b/g, '[REDACTED_ACCOUNT]');
+  }
+
+  // 6. Restore protected remote account numbers
+  if (!isLocal) {
+    for (let i = 0; i < keptAccounts.length; i++) {
+      out = out.replace('__KEPT_ACC_' + i + '__', keptAccounts[i]);
+    }
   }
 
   return out;
@@ -147,8 +171,11 @@ export function extractKeptIdentifiers(text) {
   upis.forEach(u => found.add(u));
 
   // Account numbers with context
-  const accs = text.match(/(?:account|a\/c|acc|acct|no\.?)[:\s#-]*(\d{9,18})\b/gi) || [];
-  accs.forEach(a => found.add(a));
+  const accPrefixRe = /(?<![\w\u0900-\u097F])(a\/c|acct|account|khata|खाता)(?![\w\u0900-\u097F])([^\d\n]{0,15})(\d{9,18})\b/giu;
+  let m;
+  while ((m = accPrefixRe.exec(text)) !== null) {
+    found.add(m[0].trim());
+  }
 
   return Array.from(found);
 }
