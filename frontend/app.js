@@ -157,6 +157,7 @@
       ['Monitoring', h.monitoring_state],
       ['Pipeline', `${h.pipeline?.name} (${h.pipeline?.ok ? 'ok' : 'NOT OK'})${h.pipeline?.detail ? ` – ${h.pipeline.detail}` : ''}`],
       ['Last pipeline error', h.pipeline?.last_error || '–'],
+      ['LLM backends', (h.pipeline?.llm_backends || []).map((b) => `${b.backend}: ${b.state}`).join(' · ') || '–'],
       ['Tab audio', `${cs.tab_audio || '?'} · last chunk ${age('meet_tab')}`],
       ['Local mic', `${cs.local_mic || '?'} · last chunk ${age('local_mic')}`],
       ['Video frames', `${cs.video || '?'} · last ${age('video')} · ${h.counters?.video_frames || 0} received`],

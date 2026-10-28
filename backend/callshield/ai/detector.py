@@ -145,29 +145,112 @@ class RateLimited(RuntimeError):
     pass
 
 
-def _retry_after_s(r: httpx.Response) -> float:
-    try:
-        return max(1.0, float(r.headers.get("retry-after", "10")))
-    except ValueError:
-        return 10.0
+# Both providers speak the OpenAI chat-completions format, so one request shape fits all.
+PROVIDER_URLS = {
+    "groq": GROQ_URL,
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+}
+PROVIDER_KEY_ENV = {"groq": "GROQ_API_KEY", "gemini": "GEMINI_API_KEY"}
+DEFAULT_BACKENDS = "groq:openai/gpt-oss-120b,groq:openai/gpt-oss-20b,gemini:gemini-flash-lite-latest"
+# Skip a backend before it 429s when its remaining per-minute token budget is below this.
+PROACTIVE_MIN_TOKENS = 2500
+DAILY_QUOTA_COOLDOWN_S = 900.0
+
+
+@dataclass
+class LLMBackend:
+    """One provider + model + key. The transcript context is rebuilt for every request,
+    so switching backends mid-call loses nothing."""
+    provider: str
+    model: str
+    api_key: str
+    key_env: str
+    limited_until: float = 0.0
+    last_error: str | None = None
+    calls: int = 0
+    failures: int = 0
+    rate_limited: int = 0
+
+    @property
+    def label(self) -> str:
+        return f"{self.provider}:{self.model}"
+
+
+def backends_from_env(spec: str | None = None) -> list[LLMBackend]:
+    """CALLSHIELD_LLM_BACKENDS, comma separated, in priority order:
+    provider:model[@KEY_ENV_NAME]   e.g. groq:openai/gpt-oss-120b,gemini:gemini-flash-lite-latest
+    Entries whose key is missing are skipped."""
+    spec = spec or os.environ.get("CALLSHIELD_LLM_BACKENDS") or DEFAULT_BACKENDS
+    out: list[LLMBackend] = []
+    for entry in (e.strip() for e in spec.split(",")):
+        if not entry:
+            continue
+        entry, _, key_env = entry.partition("@")
+        provider, _, model = entry.partition(":")
+        if provider not in PROVIDER_URLS or not model:
+            raise ValueError(f"bad LLM backend entry {entry!r}; expected provider:model")
+        key_env = key_env or PROVIDER_KEY_ENV[provider]
+        key = os.environ.get(key_env, "")
+        if key:
+            out.append(LLMBackend(provider, model, key, key_env))
+        else:
+            log.info("skipping LLM backend %s: %s not set", entry, key_env)
+    return out
+
+
+_DURATION = re.compile(r"(?:(\d+)h)?(?:(\d+)m(?!s))?(?:([\d.]+)s)?(?:([\d.]+)ms)?$")
+
+
+def _parse_duration_s(v: str | None) -> float | None:
+    """Groq reset headers look like '7.66s', '1m26.4s', '134ms'."""
+    if not v:
+        return None
+    m = _DURATION.match(v.strip())
+    if not m or not any(m.groups()):
+        return None
+    h, mi, s, ms = m.groups()
+    return int(h or 0) * 3600 + int(mi or 0) * 60 + float(s or 0) + float(ms or 0) / 1000
+
+
+def _cooldown_s(r: httpx.Response) -> float:
+    ra = r.headers.get("retry-after")
+    if ra:
+        try:
+            return max(1.0, float(ra))
+        except ValueError:
+            pass
+    body = r.text.lower()
+    if "per day" in body or "perday" in body or "daily" in body:
+        return DAILY_QUOTA_COOLDOWN_S
+    m = re.search(r'"retrydelay"\s*:\s*"(\d+(?:\.\d+)?)s"', body)
+    if m:
+        return max(1.0, float(m.group(1)))
+    return 20.0
+
+
+def _parse_json_content(content: str) -> dict:
+    s = content.strip()
+    if s.startswith("```"):  # some models wrap JSON in a markdown fence
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        s = s.rsplit("```", 1)[0]
+    return json.loads(s)
 
 
 def _norm(s: str) -> str:
     return _PUNCT.sub(" ", s.casefold()).strip()
 
 
-class GroqDetector:
-    def __init__(self, api_key: str, *, models: tuple[str, ...] = ("openai/gpt-oss-120b", "openai/gpt-oss-20b"),
-                 timeout_s: float = 12.0, allowed_categories: set[str] | None = None,
-                 wait_on_rate_limit: bool = False):
-        self.api_key = api_key
-        self.models = models
+class LLMDetector:
+    def __init__(self, backends: list[LLMBackend], *, timeout_s: float = 12.0,
+                 allowed_categories: set[str] | None = None, wait_on_rate_limit: bool = False):
+        if not backends:
+            raise ValueError("no LLM backends configured (set GROQ_API_KEY and/or GEMINI_API_KEY)")
+        self.backends = backends
         self.timeout_s = timeout_s
-        # Live calls must not stall: on 429 move to the next model, then fail (rule fallback).
-        # Offline evaluation sets wait_on_rate_limit=True to sleep until the budget resets.
+        # Live calls must not stall: on 429 move to the next backend, then fail (rule fallback).
+        # Offline evaluation sets wait_on_rate_limit=True to sleep until a budget resets.
         self.wait_on_rate_limit = wait_on_rate_limit
         self.reasoning_effort = os.environ.get("CALLSHIELD_LLM_EFFORT", "low")
-        self._limited_until: dict[str, float] = {}
         cats = {k: v for k, v in CATEGORY_GUIDE.items() if allowed_categories is None or k in allowed_categories}
         self.categories = cats
         self.system = SYSTEM_PROMPT.format(categories="\n".join(f"- {k}: {v}" for k, v in cats.items()))
@@ -207,45 +290,73 @@ class GroqDetector:
             except RateLimited:
                 if not self.wait_on_rate_limit:
                     raise
-                wait = max(1.0, min(self._limited_until.values()) - time.monotonic())
-                log.info("all models rate limited; waiting %.1fs", wait)
+                wait = max(1.0, min(b.limited_until for b in self.backends) - time.monotonic())
+                log.info("all LLM backends rate limited; waiting %.1fs", wait)
                 await asyncio.sleep(wait)
 
+    def _body(self, b: LLMBackend, user: str) -> dict:
+        body = {
+            "model": b.model,
+            "messages": [{"role": "system", "content": self.system}, {"role": "user", "content": user}],
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+        if b.provider == "groq":
+            body["max_completion_tokens"] = 700
+            if b.model.startswith("openai/gpt-oss"):
+                body["reasoning_effort"] = self.reasoning_effort
+        else:
+            body["max_tokens"] = 700
+        return body
+
     async def _complete_once(self, user: str) -> dict:
+        """Tries backends in priority order; a rate-limited one is skipped until it resets."""
         last_err: Exception | None = None
         limited = 0
-        for model in self.models:
-            if self._limited_until.get(model, 0) > time.monotonic():
+        for b in self.backends:
+            now = time.monotonic()
+            if b.limited_until > now:
                 limited += 1
                 continue
-            body = {
-                "model": model,
-                "messages": [{"role": "system", "content": self.system}, {"role": "user", "content": user}],
-                "temperature": 0,
-                "max_completion_tokens": 700,
-                "response_format": {"type": "json_object"},
-            }
-            if model.startswith("openai/gpt-oss"):
-                body["reasoning_effort"] = self.reasoning_effort
+            b.calls += 1
             try:
-                r = await self._client.post(GROQ_URL, json=body,
-                                            headers={"Authorization": f"Bearer {self.api_key}"})
+                r = await self._client.post(PROVIDER_URLS[b.provider], json=self._body(b, user),
+                                            headers={"Authorization": f"Bearer {b.api_key}"})
                 if r.status_code == 429:
-                    self._limited_until[model] = time.monotonic() + _retry_after_s(r)
+                    cool = _cooldown_s(r)
+                    b.limited_until = now + cool
+                    b.rate_limited += 1
+                    b.last_error = f"429, cooling down {cool:.0f}s"
                     limited += 1
-                    log.warning("groq %s rate limited for %.0fs", model, _retry_after_s(r))
+                    log.warning("LLM %s rate limited, switching backend for %.0fs", b.label, cool)
                     continue
                 r.raise_for_status()
+                remaining = r.headers.get("x-ratelimit-remaining-tokens")
+                if remaining and remaining.isdigit() and int(remaining) < PROACTIVE_MIN_TOKENS:
+                    reset = _parse_duration_s(r.headers.get("x-ratelimit-reset-tokens")) or 10.0
+                    b.limited_until = now + reset
+                    log.info("LLM %s nearly out of budget (%s tokens); resting %.1fs", b.label, remaining, reset)
                 data = r.json()
-                self.stats.last_model = model
+                result = _parse_json_content(data["choices"][0]["message"]["content"])
+                self.stats.last_model = b.label
                 self.stats.tokens += int((data.get("usage") or {}).get("total_tokens") or 0)
-                return json.loads(data["choices"][0]["message"]["content"])
-            except (httpx.HTTPError, KeyError, ValueError) as e:
+                b.last_error = None
+                return result
+            except (httpx.HTTPError, KeyError, ValueError, IndexError, TypeError) as e:
                 last_err = e
-                log.warning("groq %s failed: %r", model, e)
-        if limited == len(self.models):
-            raise RateLimited("all LLM models are rate limited")
-        raise RuntimeError(f"all LLM models failed: {last_err!r}")
+                b.failures += 1
+                b.last_error = repr(e)[:200]
+                log.warning("LLM %s failed: %r", b.label, e)
+        if limited == len(self.backends):
+            raise RateLimited("all LLM backends are rate limited")
+        raise RuntimeError(f"all LLM backends failed: {last_err!r}")
+
+    def backend_status(self) -> list[dict]:
+        now = time.monotonic()
+        return [{"backend": b.label, "key": b.key_env,
+                 "state": f"cooling {b.limited_until - now:.0f}s" if b.limited_until > now else "ready",
+                 "calls": b.calls, "rate_limited": b.rate_limited, "failures": b.failures,
+                 "last_error": b.last_error} for b in self.backends]
 
     async def analyze(self, context: list[Line], new: list[Line], prior: list[Prior]) -> Analysis:
         targets = {l.line_id: l for l in new if l.role != "local"}

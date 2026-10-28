@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 from dotenv import load_dotenv  # noqa: E402
 
 from callshield.adapter import _AWARENESS, _MOCK_RULES  # noqa: E402
-from callshield.ai.detector import Analysis, GroqDetector, Line, Prior  # noqa: E402
+from callshield.ai.detector import Analysis, Line, LLMDetector, Prior, backends_from_env  # noqa: E402
 from callshield.contracts import LEVEL_ORDER, Evidence  # noqa: E402
 from callshield.fusion import RiskEngine, load_risk_config  # noqa: E402
 
@@ -123,9 +123,7 @@ async def main() -> int:
     detector = None
     if a.mode == "llm":
         text_cats = {k for k, v in cfg.categories.items() if v.modality == "text"}
-        models = tuple(os.environ.get("CALLSHIELD_LLM_MODELS", "openai/gpt-oss-120b,openai/gpt-oss-20b").split(","))
-        detector = GroqDetector(os.environ["GROQ_API_KEY"], models=models, allowed_categories=text_cats,
-                                wait_on_rate_limit=True)
+        detector = LLMDetector(backends_from_env(), allowed_categories=text_cats, wait_on_rate_limit=True)
     convs = yaml.safe_load(open(a.set, encoding="utf-8"))["conversations"]
     if a.only:
         convs = [c for c in convs if c["id"] in a.only]

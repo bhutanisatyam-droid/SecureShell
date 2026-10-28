@@ -2,7 +2,9 @@ import asyncio
 
 import pytest
 
-from callshield.ai.detector import GroqDetector, Line, Prior, is_candidate
+import httpx
+
+from callshield.ai.detector import LLMBackend, LLMDetector, Line, Prior, _parse_duration_s, is_candidate
 from callshield.ai.pipeline import LivePipeline
 from callshield.contracts import Utterance
 from callshield.fusion import load_risk_config
@@ -14,7 +16,8 @@ def line(i, role="remote", text="Aap digital arrest mein hain, paise transfer ka
 
 @pytest.fixture
 def det():
-    return GroqDetector("k", allowed_categories=set(load_risk_config().categories))
+    return LLMDetector([LLMBackend("groq", "m", "k", "GROQ_API_KEY")],
+                       allowed_categories=set(load_risk_config().categories))
 
 
 def test_validate_grounding_rules(det):
@@ -108,3 +111,43 @@ def test_pipeline_falls_back_to_rules_and_reports(monkeypatch):
     asyncio.run(run())
     ev = [e.payload for e in emitted if e.event_type == "evidence"]
     assert ev and all(e["quality"] == 0.4 for e in ev)
+
+
+def test_failover_to_next_backend_on_429(det):
+    det.backends = [LLMBackend("groq", "openai/gpt-oss-120b", "g", "GROQ_API_KEY"),
+                    LLMBackend("gemini", "gemini-flash-lite-latest", "m", "GEMINI_API_KEY")]
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(req.url.host)
+        if "groq" in req.url.host:
+            return httpx.Response(429, headers={"retry-after": "30"}, json={"error": {"message": "rate limit"}})
+        assert req.headers["authorization"] == "Bearer m"
+        content = '```json\n{"lines": []}\n```'  # fenced JSON is tolerated
+        return httpx.Response(200, json={"choices": [{"message": {"content": content}}], "usage": {"total_tokens": 10}})
+
+    det._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    assert asyncio.run(det._complete("x")) == {"lines": []}
+    assert asyncio.run(det._complete("x")) == {"lines": []}
+    # the rate-limited backend is skipped on the second call instead of being retried
+    assert seen == ["api.groq.com", "generativelanguage.googleapis.com", "generativelanguage.googleapis.com"]
+    status = {s["backend"]: s for s in det.backend_status()}
+    assert status["groq:openai/gpt-oss-120b"]["state"].startswith("cooling")
+    assert det.stats.last_model == "gemini:gemini-flash-lite-latest"
+
+
+def test_all_backends_limited_raises_rate_limited(det):
+    from callshield.ai.detector import RateLimited
+    det._client = httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda req: httpx.Response(429, text="quota exceeded per day")))
+    with pytest.raises(RateLimited):
+        asyncio.run(det._complete("x"))
+    assert det.backends[0].limited_until - __import__("time").monotonic() > 600  # daily quota -> long cooldown
+
+
+def test_parse_groq_reset_durations():
+    assert _parse_duration_s("7.66s") == pytest.approx(7.66)
+    assert _parse_duration_s("1m26.4s") == pytest.approx(86.4)
+    assert _parse_duration_s("134ms") == pytest.approx(0.134)
+    assert _parse_duration_s("15m50.4s") == pytest.approx(950.4)
+    assert _parse_duration_s("") is None

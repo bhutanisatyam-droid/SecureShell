@@ -43,7 +43,8 @@ def load_pipeline(spec: str | None) -> AIPipeline:
     import os
     spec = spec or "auto"
     if spec == "auto":
-        spec = "live" if os.environ.get("SARVAM_API_KEY") and os.environ.get("GROQ_API_KEY") else "mock"
+        has_llm = os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")
+        spec = "live" if os.environ.get("SARVAM_API_KEY") and has_llm else "mock"
     if spec == "mock":
         return MockPipeline()
     if spec == "live":

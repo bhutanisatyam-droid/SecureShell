@@ -1,9 +1,10 @@
-"""Live AI pipeline: Sarvam streaming ASR -> rolling Hinglish transcript -> Groq LLM
-behaviour detector -> grounded `utterance` / `evidence` events.
+"""Live AI pipeline: Sarvam streaming ASR -> rolling Hinglish transcript -> LLM behaviour
+detector (Groq / Gemini backends with automatic failover) -> grounded `utterance` /
+`evidence` / `retraction` events.
 
-Select with CALLSHIELD_PIPELINE=live (or leave unset with both keys present).
-Needs SARVAM_API_KEY and GROQ_API_KEY. Vision and tone are not implemented here yet:
-frames are accepted and ignored.
+Select with CALLSHIELD_PIPELINE=live (or leave unset with the keys present).
+Needs SARVAM_API_KEY plus GROQ_API_KEY and/or GEMINI_API_KEY; backend order is set by
+CALLSHIELD_LLM_BACKENDS. Vision and tone are not implemented here yet: frames are ignored.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from ..adapter import _AWARENESS, _MOCK_RULES, Emit
 from ..contracts import (
     AudioChunk, ChatMessage, Evidence, Retraction, Utterance, VideoFrame, make_event, new_id,
 )
-from .detector import GroqDetector, Line, Prior
+from .detector import Line, LLMDetector, Prior, backends_from_env
 from .sarvam_asr import SarvamStream
 
 log = logging.getLogger("callshield.pipeline")
@@ -54,26 +55,26 @@ class LivePipeline:
 
     def __init__(self):
         self.sarvam_key = os.environ.get("SARVAM_API_KEY", "")
-        self.groq_key = os.environ.get("GROQ_API_KEY", "")
         self.asr_model = os.environ.get("CALLSHIELD_ASR_MODEL", "saaras:v4")
-        models = os.environ.get("CALLSHIELD_LLM_MODELS", "openai/gpt-oss-120b,openai/gpt-oss-20b")
-        self.llm_models = tuple(m.strip() for m in models.split(",") if m.strip())
+        self.backends = backends_from_env()
         self.min_interval_s = float(os.environ.get("CALLSHIELD_LLM_MIN_INTERVAL_S", "2.5"))
-        self.name = f"sarvam-{self.asr_model}+groq-{self.llm_models[0]}"
+        first = self.backends[0].label if self.backends else "none"
+        self.name = f"sarvam-{self.asr_model}+{first}" + (f" (+{len(self.backends) - 1} fallback)" if len(self.backends) > 1 else "")
         self.rule_refs: dict[str, list[str]] = {}
-        self.detector: GroqDetector | None = None
+        self.detector: LLMDetector | None = None
         self._s: dict[str, _SessionState] = {}
 
     def configure(self, cfg) -> None:
         text_cats = {k for k, v in cfg.categories.items() if v.modality == "text"}
         self.rule_refs = {k: v.rules for k, v in cfg.categories.items()}
-        self.detector = GroqDetector(self.groq_key, models=self.llm_models, allowed_categories=text_cats)
+        if self.backends:
+            self.detector = LLMDetector(self.backends, allowed_categories=text_cats)
 
     # ---------- AIPipeline interface ----------
 
     async def start_session(self, session_id: str, emit: Emit) -> None:
-        if not (self.sarvam_key and self.groq_key):
-            raise RuntimeError("SARVAM_API_KEY and GROQ_API_KEY are required for the live pipeline")
+        if not (self.sarvam_key and self.backends):
+            raise RuntimeError("SARVAM_API_KEY and at least one of GROQ_API_KEY / GEMINI_API_KEY are required")
         if self.detector is None:
             raise RuntimeError("pipeline not configured")
         self._s[session_id] = _SessionState(session_id, emit)
@@ -128,15 +129,16 @@ class LivePipeline:
             await s.close()
 
     def health(self) -> dict:
-        if not (self.sarvam_key and self.groq_key):
-            return {"ok": False, "detail": "missing SARVAM_API_KEY or GROQ_API_KEY"}
+        if not (self.sarvam_key and self.backends):
+            return {"ok": False, "detail": "missing SARVAM_API_KEY, or no LLM key (GROQ_API_KEY / GEMINI_API_KEY)"}
         d = self.detector.stats if self.detector else None
         streams = {f"{sid}/{role}": ("up" if s.connected else f"down: {s.error}")
                    for sid, st in self._s.items() for role, s in st.streams.items()}
         return {
             "ok": True,
-            "detail": f"ASR {self.asr_model} codemix hi-IN; LLM {', '.join(self.llm_models)}",
+            "detail": f"ASR {self.asr_model} codemix hi-IN; LLM failover: {' > '.join(b.label for b in self.backends)}",
             "asr_streams": streams,
+            "llm_backends": self.detector.backend_status() if self.detector else [],
             "llm": None if d is None else {
                 "calls": d.calls, "failures": d.failures, "last_latency_ms": d.last_latency_ms,
                 "last_model": d.last_model, "dropped": d.dropped, "tokens": d.tokens,
