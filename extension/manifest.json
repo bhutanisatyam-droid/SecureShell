@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "CallShield",
+  "version": "0.1.0",
+  "description": "Real-time fraud and digital-arrest call warnings for Google Meet (HackSplot 2026 PoC).",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabCapture", "offscreen", "storage"],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "CallShield" },
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

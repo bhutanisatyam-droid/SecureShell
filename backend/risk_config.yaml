@@ -1,0 +1,92 @@
+# CallShield risk configuration.
+# OWNER OF VALUES: Shlok (calibration). OWNER OF ENFORCEMENT: Satyam (fusion.py / policy.py).
+# Every number below is an UNCALIBRATED PLACEHOLDER derived from the guideline severities
+# (Medium / High / Very high). Replace after tuning on labelled Hinglish dev clips.
+
+version: "0.0-placeholder"
+
+# noisy_or: 1 - prod(1 - c_i)   |   additive: min(1, sum c_i)
+combine: noisy_or
+
+# Evidence fades slowly: digital-arrest calls escalate over many minutes.
+decay_half_life_s: 900
+
+# Text evidence from the protected user's own mic ("mujhe OTP aaya hai") does not count.
+speaker_factor: {remote: 1.0, unknown: 0.7, local: 0.0}
+
+# Same category + same normalized quote within this window counts once.
+dedupe_window_ms: 30000
+
+# If every text category present is "weak", risk can never exceed this.
+weak_only_cap: 0.30
+
+# Guideline: no single behaviour should alert on its own. With only one distinct text
+# category, risk stays below the "high" threshold.
+single_category_cap: 0.45
+
+categories:
+  # ---- speech / chat behaviours (modality: text) ----
+  authority_claim:       {label: "Claims to be police/CBI/ED/bank official", modality: text, weight: 0.15, strength: weak,   rules: []}
+  legal_threat:          {label: "Arrest or legal threat",                    modality: text, weight: 0.35, strength: normal, rules: [R5, R7]}
+  digital_arrest_claim:  {label: "Explicit 'digital arrest' claim",           modality: text, weight: 0.50, strength: strong, rules: [R13]}
+  credential_request:    {label: "Asks for OTP / PIN / CVV / password",       modality: text, weight: 0.40, strength: normal, rules: [R1, R10]}
+  kyc_card_request:      {label: "Asks for card / account / KYC details",     modality: text, weight: 0.35, strength: normal, rules: [R2]}
+  payment_demand:        {label: "Demands money / 'verification' payment",    modality: text, weight: 0.50, strength: strong, rules: [R10]}
+  remote_access_request: {label: "Asks to install app / remote access / screen share", modality: text, weight: 0.50, strength: strong, rules: [R8, R9]}
+  video_custody:         {label: "Forces victim to stay on video call",       modality: text, weight: 0.45, strength: strong, rules: [R9, R11]}
+  secrecy_isolation:     {label: "Tells victim to keep it secret from family", modality: text, weight: 0.35, strength: normal, rules: [R11]}
+  online_documents:      {label: "Shares FIR / warrant / ID online",          modality: text, weight: 0.30, strength: normal, rules: [R8]}
+  channel_switch:        {label: "Moves 'official' contact to WhatsApp/Skype", modality: text, weight: 0.30, strength: normal, rules: [R6]}
+  urgency_pressure:      {label: "Urgency / panic pressure",                  modality: text, weight: 0.25, strength: normal, rules: [R7]}
+  hook_story:            {label: "Parcel / drugs / passport hook story",      modality: text, weight: 0.15, strength: weak,   rules: [R12]}
+  link_request:          {label: "Asks to click a link / pay via link",       modality: text, weight: 0.15, strength: weak,   rules: [R4]}
+  unsolicited_pressure:  {label: "Unsolicited push for personal details",     modality: text, weight: 0.10, strength: weak,   rules: [R3]}
+  # ---- visual modifiers (never establish fraud alone) ----
+  visual_uniform:             {label: "Police-style uniform on camera",        modality: video, weight: 0.05, strength: weak, rules: [R9]}
+  visual_insignia:            {label: "Government insignia / office backdrop", modality: video, weight: 0.05, strength: weak, rules: []}
+  visual_official_document:   {label: "Warrant / FIR-style document shown",    modality: video, weight: 0.08, strength: weak, rules: [R8]}
+  visual_payment_instruction: {label: "Payment details shown on screen",       modality: video, weight: 0.08, strength: weak, rules: [R10]}
+  # ---- acoustic modifiers ----
+  tone_intimidation:          {label: "Intimidating / aggressive tone",        modality: tone,  weight: 0.05, strength: weak, rules: [R7]}
+
+# Video/tone only add risk once text risk reaches require_text_risk, and never more than the cap.
+modality_caps: {video: 0.10, tone: 0.05, require_text_risk: 0.25}
+
+patterns:
+  - name: digital_arrest
+    label: "Digital-arrest pattern"
+    groups:
+      - [authority_claim]
+      - [legal_threat, digital_arrest_claim]
+      - [video_custody, secrecy_isolation, channel_switch, remote_access_request]
+      - [payment_demand, credential_request]
+    min_groups: 3
+    bonus: 0.15
+  # R1/R2: someone claiming to be a bank/agency/institution asking for credentials or KYC.
+  - name: institution_credential
+    label: "Claimed institution asking for OTP/PIN/KYC"
+    groups:
+      - [authority_claim]
+      - [credential_request, kyc_card_request]
+    min_groups: 2
+    bonus: 0.15
+  - name: otp_kyc
+    label: "OTP / KYC fraud pattern"
+    groups:
+      - [credential_request]
+      - [kyc_card_request]
+      - [urgency_pressure, unsolicited_pressure]
+    min_groups: 2
+    bonus: 0.10
+
+# risk_index thresholds (0-100)
+levels: {caution: 25, high: 50, critical: 75}
+
+auto_disconnect:
+  min_text_categories: 3
+  require_strong_category: true
+  sustain_ms: 6000
+  cancel_window_ms: 8000
+  allow_on_mock: false
+
+bank_hold_level: high

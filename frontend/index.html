@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CallShield Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">CallShield <span class="sub">live fraud-call monitor</span></div>
+    <div id="conn" class="badge">connecting…</div>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <h3>Sessions</h3>
+      <ul id="sessions"></ul>
+    </aside>
+
+    <main id="main">
+      <p id="empty" class="muted">Start monitoring a Google Meet tab from the extension, or pick a session.</p>
+
+      <section id="view" class="hidden">
+        <div id="strip" class="strip"></div>
+        <div class="grid">
+          <div class="panel risk" id="riskPanel">
+            <div class="risk-head">
+              <div>
+                <div class="label">Risk index</div>
+                <div class="big"><span id="riskIndex">–</span><span class="of">/100</span></div>
+              </div>
+              <div class="right">
+                <div id="riskLevel" class="level">–</div>
+                <div id="inference" class="badge"></div>
+              </div>
+            </div>
+            <div id="monitoring" class="monitoring"></div>
+            <div class="muted small" id="strength"></div>
+            <div id="patterns" class="chips"></div>
+            <ul id="reasons" class="reasons"></ul>
+            <div class="row">
+              <button id="endCall" class="danger">End call</button>
+              <a id="reportMd" class="button" target="_blank">Incident report</a>
+              <a id="reportJson" class="button ghost" target="_blank">JSON</a>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Capture &amp; pipeline health</h3>
+            <dl id="health" class="kv"></dl>
+            <h3>Auto-disconnect gate</h3>
+            <ul id="gate" class="gate"></ul>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h3>Transcript &amp; chat <span class="muted small">(raw Hinglish, as received)</span></h3>
+            <div id="transcript" class="feed"></div>
+            <form id="inject" class="row">
+              <input id="injectText" placeholder="Test text (injected, not ASR) e.g. Aap digital arrest mein hain" />
+              <select id="injectRole"><option>remote</option><option>local</option><option>unknown</option></select>
+              <button>Inject</button>
+            </form>
+          </div>
+          <div class="panel">
+            <h3>Evidence</h3>
+            <div id="evidence" class="feed"></div>
+            <h3>Actions</h3>
+            <div id="actions" class="feed short"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Mock bank <span class="badge warn">SIMULATION</span></h3>
+          <form id="transfer" class="row">
+            <input id="amount" type="number" min="1" value="50000" />
+            <input id="payee" value="verify.cbi@upi" />
+            <button>Simulate transfer from victim's account</button>
+          </form>
+          <table class="tx"><thead><tr><th>Time</th><th>Amount (INR)</th><th>Payee</th><th>Status</th><th>Reason</th><th></th></tr></thead>
+            <tbody id="transfers"></tbody></table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
