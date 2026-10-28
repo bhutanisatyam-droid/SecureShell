@@ -1,0 +1,172 @@
+# DEV set: authored by the team/assistant that also wrote the detector prompt.
+# Use for tuning only. Final metrics must come from a held-out set written by someone else
+# (see eval/README.md). Lines: [R = remote caller, L = local protected user, text].
+# Mix of Roman Hinglish and Sarvam-style output (Hindi in Devanagari, English in Latin).
+
+conversations:
+  # ------------------------------------------------------------------ SCAMS
+  - id: s01_mumbai_police_parcel
+    label: scam
+    lines:
+      - [R, "Hello, main Mumbai Police cyber crime branch se Inspector Sharma bol raha hoon."]
+      - [L, "Haan ji, boliye kya hua?"]
+      - [R, "Aapke Aadhaar se ek parcel Taiwan bheja gaya hai jisme MDMA drugs aur paanch fake passport mile hain."]
+      - [L, "Maine toh koi parcel nahi bheja."]
+      - [R, "Aapke naam pe FIR register ho chuki hai, arrest warrant bhi nikal gaya hai."]
+      - [R, "Abhi se aap digital arrest mein hain. Camera on rakhiye aur call disconnect mat karna."]
+      - [R, "Ye case confidential hai, ghar mein kisi ko bhi batana mat."]
+      - [R, "Apna naam clear karne ke liye 1.5 lakh RBI verification account mein abhi transfer karna padega."]
+  - id: s02_cbi_devanagari
+    label: scam
+    lines:
+      - [R, "नमस्ते, मैं CBI headquarters से officer Rakesh Verma बात कर रहा हूं।"]
+      - [R, "आपके bank account में money laundering का case मिला है, आपके खिलाफ warrant issue हुआ है।"]
+      - [L, "पर मैंने कुछ गलत नहीं किया।"]
+      - [R, "आप अभी digital arrest में हैं, video call पर ही रहिए, call cut मत करना।"]
+      - [R, "अपने account का पूरा balance verification के लिए हमारे safe account में transfer करिए, जांच के बाद वापस मिल जाएगा।"]
+  - id: s03_otp_kyc_bank
+    label: scam
+    lines:
+      - [R, "Good afternoon sir, main SBI head office se bol raha hoon, aapka KYC expire ho gaya hai."]
+      - [L, "Achha? Mujhe toh koi message nahi aaya."]
+      - [R, "Sir aaj raat tak update nahi kiya toh account block ho jayega."]
+      - [R, "Aapka debit card number aur expiry date confirm kar dijiye."]
+      - [R, "Abhi aapke phone pe ek six digit code aaya hoga, woh mujhe bata dijiye jaldi."]
+  - id: s04_anydesk_refund
+    label: scam
+    lines:
+      - [R, "Hello, main Paytm customer care se bol rahi hoon, aapka 4999 ka refund pending hai."]
+      - [R, "Refund ke liye aapko AnyDesk app download karna hoga, Play Store se."]
+      - [L, "Theek hai, download ho gaya."]
+      - [R, "Ab jo nine digit code dikh raha hai woh boliye, main remotely refund process kar deti hoon."]
+      - [R, "Aur apna UPI PIN daal dijiye jab screen pe aaye."]
+  - id: s05_customs_skype
+    label: scam
+    lines:
+      - [R, "This is Delhi Customs department. A parcel in your name has been seized with illegal items."]
+      - [R, "Aapka statement record karna hai, Skype pe video call join kariye, ID main WhatsApp pe bhej raha hoon."]
+      - [R, "Ye raha aapka arrest warrant, Supreme Court ki seal ke saath, check kariye."]
+      - [R, "Jab tak investigation chal rahi hai aap kisi se baat nahi karenge, room se bahar mat jaana."]
+  - id: s06_ed_money_demand
+    label: scam
+    lines:
+      - [R, "Main Enforcement Directorate se Assistant Director Khanna hoon."]
+      - [R, "Aapka naam Naresh Goyal money laundering case mein aaya hai."]
+      - [R, "Agar aap cooperate nahi karenge toh aaj hi local police aapko utha legi."]
+      - [R, "Security deposit ke taur pe 3 lakh rupaye jama kariye, account number main chat mein bhejta hoon."]
+  - id: s07_trai_sim
+    label: scam
+    lines:
+      - [R, "मैं TRAI से बोल रहा हूं, आपके Aadhaar पर लिया गया दूसरा SIM illegal advertising में use हुआ है।"]
+      - [R, "दो घंटे में आपके सारे numbers बंद हो जाएंगे, आपकी complaint Mumbai Police को transfer की जा रही है।"]
+      - [R, "Police officer से बात करने के लिए WhatsApp video call पर आइए।"]
+      - [R, "किसी family member को मत बताना, नहीं तो उन पर भी case बनेगा।"]
+  - id: s08_fake_link_fine
+    label: scam
+    lines:
+      - [R, "Sir main traffic police se bol raha hoon, aapki gaadi ka challan pending hai court mein."]
+      - [R, "Agar aaj fine nahi bhara toh warrant nikal jayega aur licence cancel."]
+      - [R, "Main aapko ek link bhej raha hoon, uspe click karke 2000 ka payment kar dijiye abhi."]
+  - id: s09_narcotics_family_secret
+    label: scam
+    lines:
+      - [R, "NCB officer bol raha hoon. Aapke bete ko drugs ke saath pakda gaya hai."]
+      - [L, "Kya? Woh toh college mein hai!"]
+      - [R, "Agar aap chahte hain case register na ho toh 50,000 abhi is UPI ID pe bhej dijiye."]
+      - [R, "Aur kisi ko phone mat karna, warna baat bigad jayegi. Phone mat kaatna."]
+  - id: s10_video_custody_slow
+    label: scam
+    lines:
+      - [R, "Madam main Lucknow cyber cell se Sub-Inspector Yadav hoon."]
+      - [R, "Aapke number se kuch objectionable videos circulate hue hain, complaint aayi hai."]
+      - [R, "Aapko 24 ghante ki digital custody mein rakha ja raha hai, camera ke saamne baithe rahiye."]
+      - [R, "Bathroom bhi jaana ho toh pehle permission leni hogi."]
+      - [R, "Kal subah aapke bank statements verify honge, saare FDs tod ke amount ready rakhiye."]
+  - id: s11_chat_warrant_payment
+    label: scam
+    lines:
+      - [R, "Main Bengaluru police se bol raha hoon, aapki case file chat mein bhej di hai, dekhiye."]
+      - [R, "Court order ki copy bhi bheji hai, usme aapka naam saaf likha hai."]
+      - [R, "Bail ke liye online process hai, verification fees 25,000 is account mein turant bhejiye."]
+  - id: s12_insurance_otp_soft
+    label: scam
+    lines:
+      - [R, "Namaste ji, LIC se bol rahi hoon, aapki policy ka bonus 85,000 release hona hai."]
+      - [R, "Bas aapke account mein credit karne ke liye verification chahiye."]
+      - [R, "Aapke mobile pe jo OTP aaya hai woh bata dijiye, paisa turant aa jayega."]
+
+  # -------------------------------------------------------- HARD NEGATIVES
+  - id: b01_awareness_discussion
+    label: benign
+    lines:
+      - [R, "Arre tune news dekhi? Digital arrest naam ka scam chal raha hai aajkal."]
+      - [L, "Haan, mere uncle ko bhi call aaya tha."]
+      - [R, "Woh log khud ko CBI officer bolte hain aur kehte hain video call cut mat karna, phir paise transfer karwate hain."]
+      - [R, "Police kabhi video call pe arrest nahi karti, aisa call aaye toh turant kaat dena aur 1930 pe report karna."]
+  - id: b02_bank_safety_advice
+    label: benign
+    lines:
+      - [R, "Sir main aapka relationship manager bol raha hoon, bas ek reminder dena tha."]
+      - [R, "Bank kabhi bhi aapse OTP, PIN ya CVV nahi maangta, koi bhi maange toh share mat kijiye."]
+      - [R, "Aur kisi unknown link pe click mat kijiye, app se hi payment kariye."]
+  - id: b03_delivery_otp
+    label: benign
+    lines:
+      - [L, "Haan bhaiya, Amazon ka parcel hai na?"]
+      - [R, "Ji madam, main gate pe hoon. Order deliver karne ke liye app mein jo delivery OTP aaya hai woh bata dijiye."]
+      - [L, "4 8 2 1."]
+      - [R, "Done madam, parcel le lijiye. Thank you."]
+  - id: b04_passport_verification
+    label: benign
+    lines:
+      - [R, "Namaste, main local police station se constable Singh bol raha hoon, aapke passport verification ke liye."]
+      - [R, "Kal subah 11 baje thane aa jaiye original documents ke saath, Aadhaar aur address proof."]
+      - [L, "Theek hai sir, aa jaunga."]
+  - id: b05_family_money
+    label: benign
+    lines:
+      - [R, "Beta, fees ke liye paise chahiye the, 20,000 bhej doge kya?"]
+      - [L, "Haan papa, abhi UPI kar deta hoon."]
+      - [R, "Theek hai, jaldi kar dena, kal last date hai college ki."]
+  - id: b06_angry_support
+    label: benign
+    lines:
+      - [L, "Mera refund teen hafte se atka hua hai!"]
+      - [R, "Sir main samajh sakta hoon aap pareshan hain, maine ticket escalate kar diya hai."]
+      - [R, "Aapko kuch share karne ki zarurat nahi hai, refund 5 working days mein original payment method mein aa jayega."]
+  - id: b07_victim_story
+    label: benign
+    lines:
+      - [R, "पिछले हफ्ते मुझे एक call आया था, बोला मैं CBI से हूं और आप digital arrest में हैं।"]
+      - [R, "उसने बोला 2 लाख transfer करो वरना jail जाओगे, मैंने तुरंत call काट दिया।"]
+      - [L, "अच्छा किया, ऐसे लोगों की cybercrime.gov.in पर complaint करनी चाहिए।"]
+  - id: b08_lawyer_real_case
+    label: benign
+    lines:
+      - [R, "Main aapka advocate bol raha hoon, aapke property case mein court ne next hearing 12 tareekh di hai."]
+      - [R, "Summons ki physical copy aapke ghar aayegi, use sambhaal ke rakhna."]
+      - [R, "Hearing pe zaroor aana, warna court absent mark kar degi."]
+  - id: b09_work_meeting
+    label: benign
+    lines:
+      - [R, "Okay team, sprint review shuru karte hain. Payment gateway ka integration done hai?"]
+      - [L, "Haan, OTP verification flow bhi test ho gaya."]
+      - [R, "Great, screen share karo aur demo dikhao, phir WhatsApp group pe notes daal dena."]
+  - id: b10_teacher_class
+    label: benign
+    lines:
+      - [R, "Aaj hum cyber safety padhenge. Scammers bolte hain 'aapka parcel pakda gaya hai, drugs mile hain'."]
+      - [R, "Phir woh kehte hain 'kisi ko mat batana, camera on rakho' aur paise maangte hain."]
+      - [R, "Yaad rakho, aisa koi bhi call fraud hai. Exam mein iske upar question aayega."]
+  - id: b11_bank_genuine_callback
+    label: benign
+    lines:
+      - [R, "Good morning sir, HDFC Bank se call hai, aapne home loan ke liye enquiry ki thi."]
+      - [R, "Main aapko interest rates bata deti hoon, documents aap branch mein jama kar sakte hain."]
+      - [L, "Theek hai, details email kar dijiye."]
+  - id: b12_friend_joke
+    label: benign
+    lines:
+      - [R, "Oye, tu digital arrest mein hai, camera band mat karna! Haha, mazaak kar raha hoon."]
+      - [L, "Bakwas mat kar, game khelte hain."]
+      - [R, "Chal theek hai, link bhej raha hoon game ka, join kar."]

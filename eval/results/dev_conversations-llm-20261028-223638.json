@@ -1,0 +1,351 @@
+{
+  "metrics": {
+    "set": "dev_conversations.yaml",
+    "mode": "llm",
+    "threshold": "high",
+    "n": 6,
+    "scam": 3,
+    "benign": 3,
+    "tp": 2,
+    "fp": 1,
+    "tn": 2,
+    "fn": 1,
+    "accuracy": 0.667,
+    "precision": 0.667,
+    "recall": 0.667,
+    "false_positive_rate": 0.333,
+    "false_negative_rate": 0.333,
+    "llm_calls": 20,
+    "llm_failed_lines": 0,
+    "llm_latency_p50_ms": 859,
+    "llm_latency_p95_ms": 2172,
+    "llm_dropped": {},
+    "llm_tokens": 26118,
+    "llm_skipped_by_prefilter": 2,
+    "config_version": "0.0-placeholder"
+  },
+  "results": [
+    {
+      "id": "s01_mumbai_police_parcel",
+      "label": "scam",
+      "peak": "critical",
+      "first_alert": {
+        "high": 4,
+        "critical": 5
+      },
+      "n_lines": 8,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "Hello, main Mumbai Police cyber crime branch se Inspector Sharma bol raha hoon.",
+          "found": [
+            "authority_claim"
+          ],
+          "risk": 15,
+          "level": "normal"
+        },
+        {
+          "line": 1,
+          "role": "L",
+          "text": "Haan ji, boliye kya hua?",
+          "found": [],
+          "risk": 15,
+          "level": "normal"
+        },
+        {
+          "line": 2,
+          "role": "R",
+          "text": "Aapke Aadhaar se ek parcel Taiwan bheja gaya hai jisme MDMA drugs aur paanch fake passport mile hain.",
+          "found": [
+            "hook_story"
+          ],
+          "risk": 27,
+          "level": "caution"
+        },
+        {
+          "line": 3,
+          "role": "L",
+          "text": "Maine toh koi parcel nahi bheja.",
+          "found": [],
+          "risk": 27,
+          "level": "caution"
+        },
+        {
+          "line": 4,
+          "role": "R",
+          "text": "Aapke naam pe FIR register ho chuki hai, arrest warrant bhi nikal gaya hai.",
+          "found": [
+            "legal_threat"
+          ],
+          "risk": 50,
+          "level": "high"
+        },
+        {
+          "line": 5,
+          "role": "R",
+          "text": "Abhi se aap digital arrest mein hain. Camera on rakhiye aur call disconnect mat karna.",
+          "found": [
+            "digital_arrest_claim",
+            "video_custody"
+          ],
+          "risk": 99,
+          "level": "critical"
+        },
+        {
+          "line": 6,
+          "role": "R",
+          "text": "Ye case confidential hai, ghar mein kisi ko bhi batana mat.",
+          "found": [
+            "secrecy_isolation"
+          ],
+          "risk": 100,
+          "level": "critical"
+        },
+        {
+          "line": 7,
+          "role": "R",
+          "text": "Apna naam clear karne ke liye 1.5 lakh RBI verification account mein abhi transfer karna padega.",
+          "found": [
+            "payment_demand"
+          ],
+          "risk": 100,
+          "level": "critical"
+        }
+      ],
+      "llm_latency_ms": [
+        1203.9999999997235,
+        719.0000000000509,
+        1171.9999999995707,
+        2172.00000000048,
+        1890.0000000003274,
+        1765.9999999996217
+      ],
+      "llm_errors": []
+    },
+    {
+      "id": "s06_ed_money_demand",
+      "label": "scam",
+      "peak": "critical",
+      "first_alert": {
+        "high": 3,
+        "critical": 3
+      },
+      "n_lines": 4,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "Main Enforcement Directorate se Assistant Director Khanna hoon.",
+          "found": [
+            "authority_claim"
+          ],
+          "risk": 15,
+          "level": "normal"
+        },
+        {
+          "line": 1,
+          "role": "R",
+          "text": "Aapka naam Naresh Goyal money laundering case mein aaya hai.",
+          "found": [
+            "authority_claim"
+          ],
+          "risk": 15,
+          "level": "normal"
+        },
+        {
+          "line": 2,
+          "role": "R",
+          "text": "Agar aap cooperate nahi karenge toh aaj hi local police aapko utha legi.",
+          "found": [
+            "authority_claim",
+            "legal_threat"
+          ],
+          "risk": 43,
+          "level": "caution"
+        },
+        {
+          "line": 3,
+          "role": "R",
+          "text": "Security deposit ke taur pe 3 lakh rupaye jama kariye, account number main chat mein bhejta hoon.",
+          "found": [
+            "payment_demand"
+          ],
+          "risk": 86,
+          "level": "critical"
+        }
+      ],
+      "llm_latency_ms": [
+        734.0000000003783,
+        1750.0,
+        859.0000000003783,
+        984.9999999996726
+      ],
+      "llm_errors": []
+    },
+    {
+      "id": "s12_insurance_otp_soft",
+      "label": "scam",
+      "peak": "caution",
+      "first_alert": {},
+      "n_lines": 3,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "Namaste ji, LIC se bol rahi hoon, aapki policy ka bonus 85,000 release hona hai.",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        },
+        {
+          "line": 1,
+          "role": "R",
+          "text": "Bas aapke account mein credit karne ke liye verification chahiye.",
+          "found": [
+            "credential_request"
+          ],
+          "risk": 38,
+          "level": "caution"
+        },
+        {
+          "line": 2,
+          "role": "R",
+          "text": "Aapke mobile pe jo OTP aaya hai woh bata dijiye, paisa turant aa jayega.",
+          "found": [
+            "credential_request"
+          ],
+          "risk": 38,
+          "level": "caution"
+        }
+      ],
+      "llm_latency_ms": [
+        0.0,
+        859.0000000003783,
+        608.9999999994689
+      ],
+      "llm_errors": []
+    },
+    {
+      "id": "b05_family_money",
+      "label": "benign",
+      "peak": "high",
+      "first_alert": {
+        "high": 2
+      },
+      "n_lines": 3,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "Beta, fees ke liye paise chahiye the, 20,000 bhej doge kya?",
+          "found": [
+            "payment_demand"
+          ],
+          "risk": 45,
+          "level": "caution"
+        },
+        {
+          "line": 1,
+          "role": "L",
+          "text": "Haan papa, abhi UPI kar deta hoon.",
+          "found": [],
+          "risk": 45,
+          "level": "caution"
+        },
+        {
+          "line": 2,
+          "role": "R",
+          "text": "Theek hai, jaldi kar dena, kal last date hai college ki.",
+          "found": [
+            "urgency_pressure"
+          ],
+          "risk": 62,
+          "level": "high"
+        }
+      ],
+      "llm_latency_ms": [
+        811.9999999998981,
+        1407.0000000001528
+      ],
+      "llm_errors": []
+    },
+    {
+      "id": "b07_victim_story",
+      "label": "benign",
+      "peak": "normal",
+      "first_alert": {},
+      "n_lines": 3,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "पिछले हफ्ते मुझे एक call आया था, बोला मैं CBI से हूं और आप digital arrest में हैं।",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        },
+        {
+          "line": 1,
+          "role": "R",
+          "text": "उसने बोला 2 लाख transfer करो वरना jail जाओगे, मैंने तुरंत call काट दिया।",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        },
+        {
+          "line": 2,
+          "role": "L",
+          "text": "अच्छा किया, ऐसे लोगों की cybercrime.gov.in पर complaint करनी चाहिए।",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        }
+      ],
+      "llm_latency_ms": [
+        828.9999999997235,
+        2811.999999999898
+      ],
+      "llm_errors": []
+    },
+    {
+      "id": "b10_teacher_class",
+      "label": "benign",
+      "peak": "normal",
+      "first_alert": {},
+      "n_lines": 3,
+      "trace": [
+        {
+          "line": 0,
+          "role": "R",
+          "text": "Aaj hum cyber safety padhenge. Scammers bolte hain 'aapka parcel pakda gaya hai, drugs mile hain'.",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        },
+        {
+          "line": 1,
+          "role": "R",
+          "text": "Phir woh kehte hain 'kisi ko mat batana, camera on rakho' aur paise maangte hain.",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        },
+        {
+          "line": 2,
+          "role": "R",
+          "text": "Yaad rakho, aisa koi bhi call fraud hai. Exam mein iske upar question aayega.",
+          "found": [],
+          "risk": 0,
+          "level": "normal"
+        }
+      ],
+      "llm_latency_ms": [
+        592.9999999998472,
+        813.0000000001019,
+        0.0
+      ],
+      "llm_errors": []
+    }
+  ]
+}
