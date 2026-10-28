@@ -151,3 +151,19 @@ def test_parse_groq_reset_durations():
     assert _parse_duration_s("134ms") == pytest.approx(0.134)
     assert _parse_duration_s("15m50.4s") == pytest.approx(950.4)
     assert _parse_duration_s("") is None
+
+
+def test_failing_backend_is_rested(det):
+    det.backends = [LLMBackend("groq", "a", "bad", "GROQ_API_KEY"), LLMBackend("gemini", "b", "m", "GEMINI_API_KEY")]
+    seen = []
+
+    def handler(req):
+        seen.append(req.url.host)
+        if "groq" in req.url.host:
+            return httpx.Response(401, json={"error": {"message": "invalid key"}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"lines": []}'}}]})
+
+    det._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    asyncio.run(det._complete("x"))
+    asyncio.run(det._complete("x"))
+    assert seen.count("api.groq.com") == 1  # not retried on the second call
